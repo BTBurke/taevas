@@ -70,8 +70,8 @@ func (p Path) IsRoot() bool {
 	return p.root == p.dir
 }
 
-// Up walks up one directory level and returns a new path
-func (p Path) Up() (Path, error) {
+// ParentDirectory walks up one directory level and returns a new path pointing to the directory
+func (p Path) ParentDirectory() (Path, error) {
 	if p.IsRoot() {
 		return Path{}, errors.New("at go root, cannot walk up one level")
 	}
