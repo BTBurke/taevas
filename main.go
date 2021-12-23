@@ -11,10 +11,7 @@ import (
 
 func main() {
 
-	root, err := utils.GoRoot()
-	if err != nil {
-		log.Fatal(err)
-	}
+	root := utils.GoRoot()
 
 	if err := os.Chdir(filepath.Join(root, ".taevas")); err != nil {
 		log.Fatal(err)

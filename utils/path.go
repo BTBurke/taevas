@@ -14,8 +14,8 @@ type Path struct {
 	file string
 }
 
-// Parse returns a path by parsing a string that may contain a file
-func Parse(p string) Path {
+// ParsePath returns a path by parsing a string that may contain a file
+func ParsePath(p string) Path {
 	p = filepath.Clean(p)
 	d, f := filepath.Split(p)
 	// if no extension exists, the whole thing was a directory
@@ -31,7 +31,7 @@ func Parse(p string) Path {
 }
 
 // New constructs a path from a directory and file
-func New(dir string, file string) Path {
+func NewPath(dir string, file string) Path {
 	dir = filepath.Clean(dir)
 	return Path{
 		root: GoRoot(),
@@ -55,8 +55,8 @@ func (p Path) Ext() string {
 	return filepath.Ext(p.file)
 }
 
-// Name returns the file name without extension
-func (p Path) Name() string {
+// FileNameNoExt returns the file name without extension
+func (p Path) FileNameNoExt() string {
 	return strings.TrimRight(p.file, p.Ext())
 }
 
@@ -82,7 +82,7 @@ func (p Path) ParentDirectory() (Path, error) {
 	if up == "." || up == "/" {
 		return Path{}, errors.New("failed to move up one directory level")
 	}
-	return New(up, ""), nil
+	return NewPath(up, ""), nil
 }
 
 // IsDir tests whether the path is a directory
@@ -90,24 +90,15 @@ func (p Path) IsDir() bool {
 	return p.dir != "" && p.file == ""
 }
 
-// File returns a new path to a file if it exists at the directory of the current path
-func (p Path) File(name string) (Path, bool) {
-	var fpath string
-	if p.IsAbs() {
-		fpath = filepath.Join(p.dir, name)
-	} else {
-		curr, err := os.Getwd()
-		if err != nil {
-			return Path{}, false
-		}
-		fpath = filepath.Join(curr, p.dir, name)
+// Exists checks if the file exists at path
+func (p Path) Exists() bool {
+	if _, err := os.Stat(p.String()); !errors.Is(err, os.ErrNotExist) {
+		return true
 	}
-	if _, err := os.Stat(fpath); !errors.Is(err, os.ErrNotExist) {
-		return Parse(fpath), true
-	}
-	return Path{}, false
+	return false
 }
 
+// RootRelative returns the relative path from the module root
 func (p Path) RootRelative() (string, bool) {
 	if !p.IsAbs() {
 		return "", false
@@ -119,6 +110,7 @@ func (p Path) RootRelative() (string, bool) {
 	return r, true
 }
 
+// Depth returns the package level depth starting from the module root
 func (p Path) Depth() (int, bool) {
 	rr, ok := p.RootRelative()
 	if !ok {
@@ -126,3 +118,13 @@ func (p Path) Depth() (int, bool) {
 	}
 	return len(strings.Split(rr, string(filepath.Separator))), true
 }
+
+// String returns the absolute path
+func (p Path) String() string {
+	if p.IsAbs() {
+		return filepath.Join(p.dir, p.file)	
+	} else {
+		return filepath.Join(p.root, p.dir, p.file)
+	}	
+}
+
