@@ -42,7 +42,7 @@ func NewPath(dir string, file string) Path {
 
 // Dir returns the directory
 func (p Path) Dir() string {
-	return p.dir
+	return strings.TrimRight(p.dir, "/")
 }
 
 // FileName returns the file name with extension
@@ -100,6 +100,15 @@ func (p Path) Exists() bool {
 
 // RootRelative returns the relative path from the module root
 func (p Path) RootRelative() (string, bool) {
+	r, ok := p.rootRelativeDir()
+	if !ok {
+		return "", false
+	}
+	return filepath.Join(r, p.FileName()), true
+}
+
+// rootRelativeDir returns the root relative directory without filename
+func (p Path) rootRelativeDir() (string, bool) {
 	if !p.IsAbs() {
 		return "", false
 	}
@@ -107,14 +116,18 @@ func (p Path) RootRelative() (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	return r, true
+	return strings.TrimLeft(r, "."), true
 }
 
 // Depth returns the package level depth starting from the module root
 func (p Path) Depth() (int, bool) {
-	rr, ok := p.RootRelative()
+	rr, ok := p.rootRelativeDir()
 	if !ok {
 		return 0, false
+	}
+	// special case for root directory
+	if rr == "" {
+		return 0, true
 	}
 	return len(strings.Split(rr, string(filepath.Separator))), true
 }
@@ -122,9 +135,8 @@ func (p Path) Depth() (int, bool) {
 // String returns the absolute path
 func (p Path) String() string {
 	if p.IsAbs() {
-		return filepath.Join(p.dir, p.file)	
+		return filepath.Join(p.dir, p.file)
 	} else {
 		return filepath.Join(p.root, p.dir, p.file)
-	}	
+	}
 }
-
