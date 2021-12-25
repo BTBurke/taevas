@@ -5,13 +5,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/BTBurke/taevas/utils"
+	"github.com/BTBurke/taevas/build"
 	"github.com/magefile/mage/mage"
 )
 
 func main() {
 
-	root := utils.GoRoot()
+	root := build.GoRoot()
 
 	if err := os.Chdir(filepath.Join(root, ".taevas")); err != nil {
 		log.Fatal(err)

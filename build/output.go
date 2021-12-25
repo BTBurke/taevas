@@ -1,4 +1,4 @@
-package utils
+package build
 
 import (
 	"io/ioutil"

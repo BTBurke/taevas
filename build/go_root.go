@@ -1,4 +1,4 @@
-package utils
+package build
 
 var root string
 var module string
