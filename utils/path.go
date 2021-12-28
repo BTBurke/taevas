@@ -1,4 +1,4 @@
-package build
+package utils
 
 import (
 	"errors"
@@ -9,7 +9,6 @@ import (
 
 // Path represents an arbitrary location on disk, either a directory or file
 type Path struct {
-	root string
 	dir  string
 	file string
 }
@@ -17,14 +16,22 @@ type Path struct {
 // ParsePath returns a path by parsing a string that may contain a file
 func ParsePath(p string) Path {
 	p = filepath.Clean(p)
+	if p == "." {
+		return Path{
+			dir: p,
+		}
+	}
 	d, f := filepath.Split(p)
 	// if no extension exists, the whole thing was a directory
 	if filepath.Ext(f) == "" {
 		d = p
 		f = ""
 	}
+	// if no directory exists, it's a file in the root
+	if d == "" {
+		d = "."
+	}
 	return Path{
-		root: GoRoot(),
 		dir:  d,
 		file: f,
 	}
@@ -34,7 +41,6 @@ func ParsePath(p string) Path {
 func NewPath(dir string, file string) Path {
 	dir = filepath.Clean(dir)
 	return Path{
-		root: GoRoot(),
 		dir:  dir,
 		file: file,
 	}
@@ -67,17 +73,11 @@ func (p Path) IsAbs() bool {
 
 // IsRoot checks if the current path is at the module root
 func (p Path) IsRoot() bool {
-	return p.root == p.dir
+	return p.dir == "."
 }
 
 // ParentDirectory walks up one directory level and returns a new path pointing to the directory
 func (p Path) ParentDirectory() (Path, error) {
-	if p.IsRoot() {
-		return Path{}, errors.New("at go root, cannot walk up one level")
-	}
-	if !p.IsAbs() && len(strings.Split(p.dir, string(filepath.Separator))) == 1 {
-		return Path{}, errors.New("relative directory top leve, cannot walk up one level")
-	}
 	up := filepath.Dir(p.dir)
 	if up == "." || up == "/" {
 		return Path{}, errors.New("failed to move up one directory level")
@@ -99,22 +99,25 @@ func (p Path) Exists() bool {
 }
 
 // RootRelative returns the relative path from the module root
-func (p Path) RootRelative() (string, bool) {
+func (p Path) RootRelative() string {
+	if !p.IsAbs() {
+		return strings.TrimRight(filepath.Join(p.dir, p.FileName()), "/")
+	}
 	r, ok := p.rootRelativeDir()
 	if !ok {
-		return "", false
+		return strings.TrimRight(filepath.Join(p.dir, p.FileName()), "/")
 	}
-	return filepath.Join(r, p.FileName()), true
+	return strings.TrimRight(filepath.Join(r, p.FileName()), "/")
 }
 
 // rootRelativeDir returns the root relative directory without filename
 func (p Path) rootRelativeDir() (string, bool) {
 	if !p.IsAbs() {
-		return "", false
+		return p.dir, true
 	}
-	r, err := filepath.Rel(p.root, p.dir)
+	r, err := filepath.Rel(GoRoot(), p.dir)
 	if err != nil {
-		return "", false
+		return p.dir, false
 	}
 	return strings.TrimLeft(r, "."), true
 }
@@ -126,17 +129,14 @@ func (p Path) Depth() (int, bool) {
 		return 0, false
 	}
 	// special case for root directory
-	if rr == "" {
+	if rr == "." {
 		return 0, true
 	}
+	rr = strings.TrimRight(rr, string(filepath.Separator))
 	return len(strings.Split(rr, string(filepath.Separator))), true
 }
 
 // String returns the absolute path
 func (p Path) String() string {
-	if p.IsAbs() {
-		return filepath.Join(p.dir, p.file)
-	} else {
-		return filepath.Join(p.root, p.dir, p.file)
-	}
+	return filepath.Join(p.dir, p.file)
 }
