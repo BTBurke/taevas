@@ -117,6 +117,7 @@ func TestDetectTemplates(t *testing.T) {
 		"g/2.tmpl",
 		"a/1.tmpl",
 		"a/2.tmpl",
+		"a/target2.sub.tmpl",
 	}
 	var rTree []string
 	assert.NoError(t, fs.db.Select(&rTree, "SELECT template_path FROM target_tree WHERE target_path = ?", "a/target2.sub.tmpl"))
@@ -148,12 +149,12 @@ func TestComplexTrees(t *testing.T) {
 	}
 
 	expect := map[string][]string{
-		"a/1.base.tmpl": {"./_base.tmpl", "g/1.tmpl", "g/2.tmpl", "a/local1.tmpl"},
-		"a/2.sub.tmpl":  {"./_base.tmpl", "a/_sub.base.tmpl", "g/1.tmpl", "g/2.tmpl", "a/local1.tmpl"},
+		"a/1.base.tmpl": {"./_base.tmpl", "g/1.tmpl", "g/2.tmpl", "a/local1.tmpl", "a/1.base.tmpl"},
+		"a/2.sub.tmpl":  {"./_base.tmpl", "a/_sub.base.tmpl", "g/1.tmpl", "g/2.tmpl", "a/local1.tmpl", "a/2.sub.tmpl"},
 		// NOTE: when layouts shadow each other they are both placed in the parse tree.  The more local one
 		// can override the parent, if necessary.
-		"b/1.base.tmpl": {"./_base.tmpl", "b/_base.tmpl", "g/1.tmpl", "g/2.tmpl", "b/local1.tmpl"},
-		"b/2.sub.tmpl":  {"./_base.tmpl", "b/_base.tmpl", "b/_sub.base.tmpl", "g/1.tmpl", "g/2.tmpl", "b/local1.tmpl"},
+		"b/1.base.tmpl": {"./_base.tmpl", "b/_base.tmpl", "g/1.tmpl", "g/2.tmpl", "b/local1.tmpl", "b/1.base.tmpl"},
+		"b/2.sub.tmpl":  {"./_base.tmpl", "b/_base.tmpl", "b/_sub.base.tmpl", "g/1.tmpl", "g/2.tmpl", "b/local1.tmpl", "b/2.sub.tmpl"},
 	}
 
 	fs, err := New("/test")
@@ -178,5 +179,14 @@ func TestComplexTrees(t *testing.T) {
 	assert.NoError(t, fs.db.Select(&templates, "SELECT * FROM all_templates"))
 	for _, f := range files[:len(files)-2] {
 		assert.Contains(t, templates, f)
+	}
+
+	// should have all template directories with the exception of the unused template
+	expectDirs := []string{".", "g", "a", "b"}
+	var dirs []string
+	assert.NoError(t, fs.db.Select(&dirs, "SELECT * FROM all_template_directories"))
+	assert.Equal(t, len(expectDirs), len(dirs))
+	for _, d := range expectDirs {
+		assert.Contains(t, dirs, d)
 	}
 }

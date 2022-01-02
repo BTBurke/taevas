@@ -83,9 +83,11 @@ CREATE VIEW IF NOT EXISTS globals AS
 -- back to the module root.  This may result in layouts with the same name shadowing one higher up in the tree.
 CREATE VIEW IF NOT EXISTS target_layout AS
   SELECT 
-    targets.id as target_id, 
+    targets.id as target_id,
+    targets.dir as target_dir,
     targets.dir || '/' || targets.filename as target_path,
     layouts.id as layout_id,
+    layouts.dir as layout_dir,
     layouts.dir || '/' || layouts.filename as layout_path    
     FROM targets JOIN layouts
     ON targets.filename LIKE '%.' || (SELECT short_name FROM layouts_short_name WHERE id = layouts.id) || '.%'
@@ -96,8 +98,10 @@ CREATE VIEW IF NOT EXISTS target_layout AS
 CREATE VIEW IF NOT EXISTS target_locals AS
   SELECT
     targets.id as target_id,
+    targets.dir as target_dir,
     targets.dir || '/' || targets.filename as target_path,
     locals.id as local_id,
+    locals.dir as local_dir,
     locals.dir || '/' || locals.filename as local_path
     FROM targets JOIN locals
     ON targets.dir = locals.dir;
@@ -107,8 +111,10 @@ CREATE VIEW IF NOT EXISTS target_locals AS
 CREATE VIEW IF NOT EXISTS target_globals AS
   SELECT
     targets.id as target_id,
+    targets.dir as target_dir,
     targets.dir || '/' || targets.filename as target_path,
     globals.id as global_id,
+    globals.dir as global_dir,
     globals.dir || '/' || globals.filename as global_path
     FROM targets CROSS JOIN globals;
 
@@ -116,9 +122,11 @@ CREATE VIEW IF NOT EXISTS target_globals AS
 -- an arbitrary tree of layout template inheritance.
 CREATE VIEW IF NOT EXISTS layout_parent AS
   SELECT 
-    l1.id as layout_id, 
+    l1.id as layout_id,
+    l1.dir as layout_dir,
     l1.dir || '/' || l1.filename as layout_path,
     l2.id as parent_id,
+    l2.dir as parent_dir,
     l2.dir || '/' || l2.filename as parent_path    
     FROM layouts l1 JOIN layouts l2 
     ON l1.filename LIKE '%.' || (SELECT short_name FROM layouts_short_name WHERE id = l2.id) || '.%'
@@ -127,13 +135,13 @@ CREATE VIEW IF NOT EXISTS layout_parent AS
 
 -- A recursive view that yields a tree of layouts needed to render a target
 CREATE VIEW IF NOT EXISTS layout_tree AS 
-  WITH RECURSIVE layout_cte(target_path, layout_path, ord) AS (
-    SELECT target_path, layout_path, (SELECT 0) as ord
+  WITH RECURSIVE layout_cte(target_dir, target_path, layout_dir, layout_path, ord) AS (
+    SELECT target_dir, target_path, layout_dir, layout_path, (SELECT 0) as ord
     FROM target_layout 
-
+re
     UNION ALL
 
-    SELECT cte.target_path, lp.parent_path, cte.ord + 1 as ord
+    SELECT cte.target_dir as target_dir, cte.target_path as target_path, lp.parent_dir as layout_dir, lp.parent_path as layout_path, cte.ord + 1 as ord
     FROM layout_cte cte JOIN layout_parent lp ON cte.layout_path = lp.layout_path
   )
   SELECT * FROM layout_cte ORDER BY ord DESC; 
@@ -143,11 +151,13 @@ CREATE VIEW IF NOT EXISTS layout_tree AS
 -- This is the only view really needed to render a particular target.  It makes use of all the other views to determine a per-target
 -- tree of all required templates.
 CREATE VIEW IF NOT EXISTS target_tree AS
-  SELECT target_path, layout_path as template_path FROM layout_tree
+  SELECT DISTINCT target_path, layout_dir as template_dir, layout_path as template_path FROM layout_tree
   UNION ALL
-  SELECT target_path, global_path as template_path FROM target_globals
+  SELECT DISTINCT target_path, global_dir as template_dir, global_path as template_path FROM target_globals
   UNION ALL
-  SELECT target_path, local_path as template_path FROM target_locals;
+  SELECT DISTINCT target_path, local_dir as template_dir, local_path as template_path FROM target_locals
+  UNION ALL
+  SELECT DISTINCT target_path, target_dir as template_dir, target_path as template_path from layout_tree;
 
 -- Set of all templates needed to render every target
 CREATE VIEW IF NOT EXISTS all_templates AS
@@ -155,3 +165,6 @@ CREATE VIEW IF NOT EXISTS all_templates AS
   UNION ALL
   SELECT DISTINCT target_path as template_path FROM target_tree;
 
+-- Set of all directories that include template files
+CREATE VIEW IF NOT EXISTS all_template_directories AS
+  SELECT DISTINCT template_dir FROM target_tree;
