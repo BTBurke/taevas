@@ -143,9 +143,9 @@ CREATE VIEW IF NOT EXISTS layout_tree AS
 -- This is the only view really needed to render a particular target.  It makes use of all the other views to determine a per-target
 -- tree of all required templates.
 CREATE VIEW IF NOT EXISTS target_tree AS
-  SELECT target_path, layout_path FROM layout_tree
+  SELECT target_path, layout_path as template_path FROM layout_tree
   UNION ALL
-  SELECT target_path, global_path as layout_path FROM target_globals
+  SELECT target_path, global_path as template_path FROM target_globals
   UNION ALL
-  SELECT target_path, local_path as layout_path FROM target_locals;
+  SELECT target_path, local_path as template_path FROM target_locals;
 

@@ -78,7 +78,6 @@ func TestDetectTemplates(t *testing.T) {
 			var templates []string
 			assert.NoError(t, fs.db.Select(&templates, "SELECT dir || '/' || filename FROM "+ttype))
 			assert.Equal(t, expect[ttype], templates)
-			t.Logf("%s: %+v", ttype, templates)
 		})
 	}
 
@@ -87,7 +86,6 @@ func TestDetectTemplates(t *testing.T) {
 		var short string
 		assert.NoError(t, fs.db.Get(&short, "SELECT short_name FROM layouts_short_name WHERE filename = ? LIMIT 1", layout))
 		assert.Equal(t, expect["shorts"][i], short)
-		t.Logf("short - %s:%s", layout, short)
 	}
 
 	// a target should be able to find its possible parent layouts
@@ -96,7 +94,6 @@ func TestDetectTemplates(t *testing.T) {
 		var parents []string
 		assert.NoError(t, fs.db.Select(&parents, "SELECT layout_path FROM target_layout WHERE target_path = ?", target))
 		assert.Equal(t, expect["layouts"][i], parents[0])
-		t.Logf("%s: %v", target, parents)
 	}
 
 	// a layout can have a parent layout
@@ -104,7 +101,6 @@ func TestDetectTemplates(t *testing.T) {
 		var parents []string
 		assert.NoError(t, fs.db.Select(&parents, "SELECT parent_path FROM layout_parent WHERE layout_path = ?", lp))
 		assert.Equal(t, expect["layouts"][i], parents[0])
-		t.Logf("%s: %v", lp, parents)
 	}
 
 	// a nested layout should yield the full tree of layout templates required for the target
@@ -112,7 +108,6 @@ func TestDetectTemplates(t *testing.T) {
 	var tree []string
 	assert.NoError(t, fs.db.Select(&tree, "SELECT layout_path FROM layout_tree WHERE target_path = ?", "a/target2.sub.tmpl"))
 	assert.Equal(t, expectTree, tree)
-	t.Logf("tree: %v", tree)
 
 	// each target should yield the full tree of templates required to render the template
 	expectRenderTree := []string{
@@ -124,7 +119,53 @@ func TestDetectTemplates(t *testing.T) {
 		"a/2.tmpl",
 	}
 	var rTree []string
-	assert.NoError(t, fs.db.Select(&rTree, "SELECT layout_path FROM target_tree WHERE target_path = ?", "a/target2.sub.tmpl"))
+	assert.NoError(t, fs.db.Select(&rTree, "SELECT template_path FROM target_tree WHERE target_path = ?", "a/target2.sub.tmpl"))
 	assert.Equal(t, expectRenderTree, rTree)
-	t.Logf("render tree: %v", rTree)
+}
+
+func TestComplexTrees(t *testing.T) {
+
+	files := []string{
+		// base layout
+		"_base.tmpl",
+		// some globals
+		"g/1.tmpl",
+		"g/2.tmpl",
+		// 1 deep target
+		"a/1.base.tmpl",
+		"a/2.sub.tmpl",
+		"a/local1.tmpl",
+		// inherited layout
+		"a/_sub.base.tmpl",
+		// parallel structure
+		"b/1.base.tmpl",
+		"b/_sub.base.tmpl",
+		"b/local1.tmpl",
+		"b/2.sub.tmpl",
+		// more deeply nested layout with confounding name which should not match any target
+		"b/c/_sub.base.tmpl",
+	}
+
+	expect := map[string][]string{
+		"a/1.base.tmpl": {"./_base.tmpl", "g/1.tmpl", "g/2.tmpl", "a/local1.tmpl"},
+		"a/2.sub.tmpl":  {"./_base.tmpl", "a/_sub.base.tmpl", "g/1.tmpl", "g/2.tmpl", "a/local1.tmpl"},
+		"b/1.base.tmpl": {"./_base.tmpl", "g/1.tmpl", "g/2.tmpl", "b/local1.tmpl"},
+		"b/2.sub.tmpl":  {"./_base.tmpl", "b/_sub.base.tmpl", "g/1.tmpl", "g/2.tmpl", "b/local1.tmpl"},
+	}
+
+	fs, err := New("/test")
+	require.NoError(t, err)
+
+	// populate in memory file system
+	for _, f := range files {
+		if _, err := fs.AddFile(f); err != nil {
+			require.NoError(t, err)
+		}
+	}
+
+	for target, expectedTree := range expect {
+		var tree []string
+		assert.NoError(t, fs.db.Select(&tree, "SELECT template_path FROM target_tree WHERE target_path = ?", target))
+		assert.Equal(t, expectedTree, tree)
+	}
 }
