@@ -127,7 +127,7 @@ func TestComplexTrees(t *testing.T) {
 
 	files := []string{
 		// base layout
-		"_base.tmpl",
+		"./_base.tmpl",
 		// some globals
 		"g/1.tmpl",
 		"g/2.tmpl",
@@ -166,9 +166,17 @@ func TestComplexTrees(t *testing.T) {
 		}
 	}
 
+	// check all trees
 	for target, expectedTree := range expect {
 		var tree []string
 		assert.NoError(t, fs.db.Select(&tree, "SELECT template_path FROM target_tree WHERE target_path = ?", target))
 		assert.Equal(t, expectedTree, tree, "failed for %s", target)
+	}
+
+	// should have all templates from above with the exception of the last one that is not used
+	var templates []string
+	assert.NoError(t, fs.db.Select(&templates, "SELECT * FROM all_templates"))
+	for _, f := range files[:len(files)-2] {
+		assert.Contains(t, templates, f)
 	}
 }

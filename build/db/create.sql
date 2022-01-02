@@ -48,7 +48,7 @@ CREATE VIEW IF NOT EXISTS directories AS
 CREATE VIEW IF NOT EXISTS layouts AS 
   SELECT * FROM fs WHERE filename LIKE '__%' || (SELECT * FROM template_extension) ESCAPE '_';
 
--- returns the short name of the template _layout.tmpl -> layout
+-- returns the short name of the template _layout.tmpl -> layout or _inherited.layout.tmpl -> inherited
 CREATE VIEW IF NOT EXISTS layouts_short_name AS
   SELECT
     id,
@@ -79,8 +79,8 @@ CREATE VIEW IF NOT EXISTS globals AS
   AND id NOT IN (SELECT id FROM targets)
   AND id NOT IN (SELECT id FROM locals);
 
--- Finds the layout associated with the target.  The first layout that matches walking from the target
--- back to the module root is the layout used.
+-- Finds the layout associated with the target.  It returns all layouts that match walking from the target
+-- back to the module root.  This may result in layouts with the same name shadowing one higher up in the tree.
 CREATE VIEW IF NOT EXISTS target_layout AS
   SELECT 
     targets.id as target_id, 
@@ -148,4 +148,10 @@ CREATE VIEW IF NOT EXISTS target_tree AS
   SELECT target_path, global_path as template_path FROM target_globals
   UNION ALL
   SELECT target_path, local_path as template_path FROM target_locals;
+
+-- Set of all templates needed to render every target
+CREATE VIEW IF NOT EXISTS all_templates AS
+  SELECT DISTINCT template_path FROM target_tree
+  UNION ALL
+  SELECT DISTINCT target_path as template_path FROM target_tree;
 
