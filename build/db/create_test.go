@@ -137,7 +137,8 @@ func TestComplexTrees(t *testing.T) {
 		"a/local1.tmpl",
 		// inherited layout
 		"a/_sub.base.tmpl",
-		// parallel structure
+		// parallel structure with shadowed base template
+		"b/_base.tmpl",
 		"b/1.base.tmpl",
 		"b/_sub.base.tmpl",
 		"b/local1.tmpl",
@@ -149,8 +150,10 @@ func TestComplexTrees(t *testing.T) {
 	expect := map[string][]string{
 		"a/1.base.tmpl": {"./_base.tmpl", "g/1.tmpl", "g/2.tmpl", "a/local1.tmpl"},
 		"a/2.sub.tmpl":  {"./_base.tmpl", "a/_sub.base.tmpl", "g/1.tmpl", "g/2.tmpl", "a/local1.tmpl"},
-		"b/1.base.tmpl": {"./_base.tmpl", "g/1.tmpl", "g/2.tmpl", "b/local1.tmpl"},
-		"b/2.sub.tmpl":  {"./_base.tmpl", "b/_sub.base.tmpl", "g/1.tmpl", "g/2.tmpl", "b/local1.tmpl"},
+		// NOTE: when layouts shadow each other they are both placed in the parse tree.  The more local one
+		// can override the parent, if necessary.
+		"b/1.base.tmpl": {"./_base.tmpl", "b/_base.tmpl", "g/1.tmpl", "g/2.tmpl", "b/local1.tmpl"},
+		"b/2.sub.tmpl":  {"./_base.tmpl", "b/_base.tmpl", "b/_sub.base.tmpl", "g/1.tmpl", "g/2.tmpl", "b/local1.tmpl"},
 	}
 
 	fs, err := New("/test")
@@ -166,6 +169,6 @@ func TestComplexTrees(t *testing.T) {
 	for target, expectedTree := range expect {
 		var tree []string
 		assert.NoError(t, fs.db.Select(&tree, "SELECT template_path FROM target_tree WHERE target_path = ?", target))
-		assert.Equal(t, expectedTree, tree)
+		assert.Equal(t, expectedTree, tree, "failed for %s", target)
 	}
 }

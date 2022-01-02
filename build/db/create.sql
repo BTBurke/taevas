@@ -90,7 +90,7 @@ CREATE VIEW IF NOT EXISTS target_layout AS
     FROM targets JOIN layouts
     ON targets.filename LIKE '%.' || (SELECT short_name FROM layouts_short_name WHERE id = layouts.id) || '.%'
     WHERE targets.dir LIKE LTRIM(layouts.dir, '.') || '%'
-    ORDER BY layouts.depth DESC;
+    ORDER BY layouts.depth ASC;
 
 -- Finds all local partial templates in the same directory as the target
 CREATE VIEW IF NOT EXISTS target_locals AS
@@ -123,7 +123,7 @@ CREATE VIEW IF NOT EXISTS layout_parent AS
     FROM layouts l1 JOIN layouts l2 
     ON l1.filename LIKE '%.' || (SELECT short_name FROM layouts_short_name WHERE id = l2.id) || '.%'
     WHERE l1.dir LIKE LTRIM(l2.dir, '.') || '%'
-    ORDER BY l2.depth DESC;
+    ORDER BY l2.depth ASC;
 
 -- A recursive view that yields a tree of layouts needed to render a target
 CREATE VIEW IF NOT EXISTS layout_tree AS 
