@@ -43,6 +43,29 @@ CREATE VIEW IF NOT EXISTS filesystem AS
 CREATE VIEW IF NOT EXISTS directories AS
   SELECT DISTINCT dir, depth FROM fs;
 
+-- View of all files and subdirectories for a given directory
+CREATE VIEW IF NOT EXISTS read_dir AS
+  SELECT 
+    d.dir,
+    fs.id,
+    fs.dir || '/' || fs.filename as path,
+    fs.data,
+    fs.backing,
+    (SELECT datetime(fs.modtime, 'unixepoch', 'localtime')) as time
+  FROM directories d JOIN fs
+  ON fs.dir = d.dir
+  UNION ALL
+  SELECT
+    d.dir,
+    (SELECT -1) as id,
+    d2.dir as path,
+    (SELECT NULL) as data,
+    (SELECT 0) as backing,
+    (SELECT datetime(CURRENT_TIMESTAMP, 'unixepoch', 'localtime')) as time
+    FROM directories d JOIN directories d2
+    ON d2.dir LIKE d.dir || '%' AND d2.depth = d.depth + 1;
+
+
 -- finds layout templates that look start with a _.  Layouts may also inherit from other layouts using
 -- _layout.parent.tmpl
 CREATE VIEW IF NOT EXISTS layouts AS 

@@ -1,4 +1,4 @@
-package db
+package fs
 
 import (
 	"testing"
@@ -27,7 +27,7 @@ func TestAddFiles(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			id, err := fs.AddFile(tc.path)
+			id, err := fs.Add(tc.path)
 			switch tc.shouldErr {
 			case true:
 				assert.Error(t, err)
@@ -67,7 +67,7 @@ func TestDetectTemplates(t *testing.T) {
 
 	// populate in memory file system
 	for _, tc := range tt {
-		if _, err := fs.AddFile(tc.path); err != nil {
+		if _, err := fs.Add(tc.path); err != nil {
 			assert.NoError(t, err)
 		}
 	}
@@ -162,7 +162,7 @@ func TestComplexTrees(t *testing.T) {
 
 	// populate in memory file system
 	for _, f := range files {
-		if _, err := fs.AddFile(f); err != nil {
+		if _, err := fs.Add(f); err != nil {
 			require.NoError(t, err)
 		}
 	}
