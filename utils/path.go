@@ -138,5 +138,8 @@ func (p Path) Depth() (int, bool) {
 
 // String returns the absolute path
 func (p Path) String() string {
+	if p.dir == "." {
+		return p.dir + "/" + p.file
+	}
 	return filepath.Join(p.dir, p.file)
 }

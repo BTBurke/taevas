@@ -15,7 +15,7 @@ type Entry struct {
 	Path    string
 	Data    []byte
 	Backing int
-	Mod     time.Time `sql:"time"`
+	Time    int64 `sql:"time"`
 
 	buf  *bytes.Reader
 	fh   *os.File
@@ -51,9 +51,9 @@ func (e Entry) IsDir() bool {
 func (e Entry) Type() fs.FileMode {
 	p := utils.ParsePath(e.Path)
 	if p.IsDir() {
-		return fs.ModeDir
+		return 0755
 	}
-	return fs.ModePerm
+	return 0644
 }
 
 func (e Entry) Size() int64 {
@@ -65,7 +65,7 @@ func (e Entry) Mode() fs.FileMode {
 }
 
 func (e Entry) ModTime() time.Time {
-	return e.Mod
+	return time.Unix(e.Time, 0)
 }
 
 func (e Entry) Sys() interface{} { return nil }

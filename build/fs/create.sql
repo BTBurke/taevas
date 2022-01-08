@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS fs (
   data BLOB,
   depth INTEGER NOT NULL DEFAULT 0 CHECK(depth >= 0),
   backing INTEGER NOT NULL DEFAULT 0 CHECK(backing >= 0 AND backing <= 1),
-  modtime INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP
+  modtime INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS full_path_idx ON fs(dir,filename);
@@ -35,7 +35,7 @@ CREATE VIEW IF NOT EXISTS filesystem AS
     dir || '/' || filename as path,
     data,
     backing,
-    (SELECT datetime(modtime, 'unixepoch', 'localtime')) as time
+    modtime as time
   FROM
     fs;
 
@@ -51,20 +51,29 @@ CREATE VIEW IF NOT EXISTS read_dir AS
     fs.dir || '/' || fs.filename as path,
     fs.data,
     fs.backing,
-    (SELECT datetime(fs.modtime, 'unixepoch', 'localtime')) as time
+    fs.modtime as time
   FROM directories d JOIN fs
   ON fs.dir = d.dir
   UNION ALL
   SELECT
     d.dir,
     (SELECT -1) as id,
+    SUBSTR(d2.dir, length(d.dir)+2) as path,
+    (SELECT NULL) as data,
+    (SELECT -1) as backing,
+    (SELECT (strftime('%s', 'now'))) as time
+    FROM directories d JOIN directories d2
+    ON d2.dir LIKE d.dir || '%' AND d2.depth = d.depth + 1
+  UNION ALL
+  SELECT
+    d.dir,
+    (SELECT -1) as id,
     d2.dir as path,
     (SELECT NULL) as data,
-    (SELECT 0) as backing,
-    (SELECT datetime(CURRENT_TIMESTAMP, 'unixepoch', 'localtime')) as time
+    (SELECT -1) as backing,
+    (SELECT (strftime('%s', 'now'))) as time
     FROM directories d JOIN directories d2
-    ON d2.dir LIKE d.dir || '%' AND d2.depth = d.depth + 1;
-
+    ON (d.dir = '.' AND d2.depth = 1); 
 
 -- finds layout templates that look start with a _.  Layouts may also inherit from other layouts using
 -- _layout.parent.tmpl

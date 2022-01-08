@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"io/ioutil"
+	"sort"
 	"sync"
 
 	"github.com/BTBurke/taevas/utils"
@@ -34,6 +35,7 @@ func (f *Filesystem) add(name string, backing int, data []byte) (int, error) {
 	if !ok {
 		return -1, fmt.Errorf("file exists outside go module: %s", name)
 	}
+	// lock not strictly necessary
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -44,17 +46,33 @@ func (f *Filesystem) add(name string, backing int, data []byte) (int, error) {
 	return id, nil
 }
 
+// returns a blank entry with the root preserved
+func (f *Filesystem) newEntry() *Entry {
+	return &Entry{
+		root: f.root,
+	}
+}
+
 // Open returns an fs.File or a fs.PathError if the file does not exist
 func (f *Filesystem) Open(name string) (fs.File, error) {
-	var e Entry
-	if err := f.db.Get(&e, "SELECT * FROM filesystem WHERE path = ? LIMIT 1", name); err != nil {
+	p := utils.ParsePath(name)
+	_, ok := p.Depth()
+	if !ok {
+		return nil, &fs.PathError{
+			Op:   "open",
+			Path: name,
+			Err:  fmt.Errorf("lookup in fs database failed: file exists outside filesystem root"),
+		}
+	}
+	e := f.newEntry()
+	if err := f.db.Get(e, "SELECT * FROM filesystem WHERE path = ? LIMIT 1", p.String()); err != nil {
 		return &Entry{}, &fs.PathError{
 			Op:   "open",
 			Path: name,
 			Err:  fmt.Errorf("lookup in fs database failed: %w", err),
 		}
 	}
-	return &e, nil
+	return e, nil
 }
 
 // ReadDir returns all directory entries or a PathError
@@ -75,8 +93,12 @@ func (f *Filesystem) ReadDir(name string) ([]fs.DirEntry, error) {
 			Err:  fmt.Errorf("error getting path listing from db: %w", err),
 		}
 	}
+	// set up for binary search to match default sort for embed.FS
+	sort.Slice(e, func(i, j int) bool { return e[i].Name() < e[j].Name() })
+
 	out := make([]fs.DirEntry, len(e))
 	for i, entry := range e {
+		entry.root = f.root
 		out[i] = entry
 	}
 
@@ -85,15 +107,24 @@ func (f *Filesystem) ReadDir(name string) ([]fs.DirEntry, error) {
 
 // ReadFile returns the file contents or a PathError
 func (f *Filesystem) ReadFile(name string) ([]byte, error) {
-	var e Entry
-	if err := f.db.Get(&e, "SELECT * FROM filesystem WHERE path = ? LIMIT 1", name); err != nil {
+	p := utils.ParsePath(name)
+	_, ok := p.Depth()
+	if !ok {
+		return nil, &fs.PathError{
+			Op:   "open",
+			Path: name,
+			Err:  fmt.Errorf("lookup in fs database failed: file exists outside filesystem root"),
+		}
+	}
+	e := f.newEntry()
+	if err := f.db.Get(e, "SELECT * FROM filesystem WHERE path = ? LIMIT 1", p.String()); err != nil {
 		return nil, &fs.PathError{
 			Op:   "readfile",
 			Path: name,
 			Err:  fmt.Errorf("error reading file from db: %w", err),
 		}
 	}
-	b, err := ioutil.ReadAll(&e)
+	b, err := ioutil.ReadAll(e)
 	if err != nil {
 		return nil, &fs.PathError{
 			Op:   "readfile",
