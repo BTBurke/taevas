@@ -125,7 +125,6 @@ func TestDetectTemplates(t *testing.T) {
 }
 
 func TestComplexTrees(t *testing.T) {
-
 	files := []string{
 		// base layout
 		"./_base.tmpl",

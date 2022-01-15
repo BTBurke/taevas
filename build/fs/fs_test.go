@@ -68,7 +68,7 @@ func TestVirtualRead(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// it should read and stat a disk-backed file
+	// it should read and stat a virtual file
 	f, err := fs.Open("test.dat")
 	require.NoError(t, err)
 	finfo, err := f.Stat()
@@ -94,6 +94,27 @@ func TestVirtualRead(t *testing.T) {
 	b2, err := fs.ReadFile("./test.dat")
 	require.NoError(t, err)
 	assert.Equal(t, testData, b2)
+}
+
+func TestFlush(t *testing.T) {
+	td, err := os.MkdirTemp("", "taevas")
+	require.NoError(t, err)
+	defer os.RemoveAll(td)
+
+	testData := []byte("this is a test")
+
+	fs, err := New(td)
+	require.NoError(t, err)
+	if _, err := fs.AddVirtual("test.dat", testData); err != nil {
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, fs.Flush())
+
+	got, err := os.ReadFile(filepath.Join(td, "test.dat"))
+	require.NoError(t, err)
+	assert.Equal(t, testData, got)
+
 }
 
 //go:embed testdata

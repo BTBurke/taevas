@@ -2,6 +2,7 @@ package fs
 
 import (
 	"bytes"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -103,6 +104,26 @@ func (e *Entry) Close() error {
 		e.buf = nil
 		return nil
 	}
+	return nil
+}
+
+func (e *Entry) flush() error {
+	if e.root == "" {
+		return &fs.PathError{
+			Op:   "flush",
+			Path: e.Path,
+			Err:  fmt.Errorf("no root set for entry"),
+		}
+	}
+
+	p := filepath.Join(e.root, e.Path)
+	if err := os.WriteFile(p, e.Data, 0644); err != nil {
+		return fmt.Errorf("failed to flush file to disk: %w", err)
+	}
+
+	// entry is now disk-backed
+	e.Backing = 0
+	e.Data = nil
 	return nil
 }
 

@@ -135,6 +135,30 @@ func (f *Filesystem) ReadFile(name string) ([]byte, error) {
 	return b, nil
 }
 
+// Flush writes all virtual files to disk
+func (f *Filesystem) Flush() error {
+	rows, err := f.db.Queryx("SELECT * FROM filesystem WHERE backing = 1")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		e := f.newEntry()
+		if err := rows.StructScan(e); err != nil {
+			return err
+		}
+		if err := e.flush(); err != nil {
+			return err
+		}
+	}
+
+	if _, err := f.db.Exec("UPDATE fs SET backing = 0, data = NULL WHERE backing = 1"); err != nil {
+		return fmt.Errorf("failed to update filesystem database afer flush: %w", err)
+	}
+	return nil
+}
+
 // Filesystem implements:
 // fs.FS
 // fs.ReadDirFS
