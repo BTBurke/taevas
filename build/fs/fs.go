@@ -159,6 +159,11 @@ func (f *Filesystem) Flush() error {
 	return nil
 }
 
+// Conn returns the underlying database connection to execute arbitrary SQL
+func (f *Filesystem) Conn() *sqlx.DB {
+	return f.db
+}
+
 // Filesystem implements:
 // fs.FS
 // fs.ReadDirFS

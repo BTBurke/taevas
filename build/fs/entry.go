@@ -98,7 +98,11 @@ func (e *Entry) Read(b []byte) (int, error) {
 
 func (e *Entry) Close() error {
 	if e.Backing == 0 && e.fh != nil {
-		return e.fh.Close()
+		if err := e.fh.Close(); err != nil {
+			return err
+		}
+		e.fh = nil
+		return nil
 	}
 	if e.buf != nil {
 		e.buf = nil
