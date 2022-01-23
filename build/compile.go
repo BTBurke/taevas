@@ -9,33 +9,110 @@ import (
 
 	"github.com/BTBurke/taevas/build/fs"
 	"github.com/BTBurke/taevas/utils"
+	"golang.org/x/net/html"
 )
 
-type Context struct {
-	// a lookup table where the key is the target to render and a list of possible template references that are resolvable from the target
-	Targets map[string][]string
-
-	options options
-	in      *fs.Filesystem
-	out     *fs.Filesystem
+// Node is a single tag in an HTML document
+type Node struct {
+	name    string
+	dir     string
+	prev    *Node
+	current *html.Node
 }
 
-func New(root string, opts ...BuildOption) (*Context, error) {
-	// sets up defaults which can be overridden by later options
-	allOpts := append([]BuildOption{
-		withRoot(root),
-		WithOutputDirectory("dist", true),
-		WithTemplateExtension(".tmpl"),
-		WithTimeout(30 * time.Second),
-	}, opts...)
+// TemplateName is the name of the template currently being parsed
+func (n *Node) TemplateName() string {
+	return n.name
+}
 
-	var o options
-	for _, opt := range allOpts {
-		if err := opt(&o); err != nil {
-			return nil, fmt.Errorf("error setting build option: %w", err)
+// TemplateDir is the directory in which the current template resides. This is
+// useful for resolving relative paths.
+func (n *Node) TemplateDir() string {
+	return n.dir
+}
+
+// Attrs returns all the attributes of the current node
+func (n *Node) Attrs() []html.Attribute {
+	return n.current.Attr
+}
+
+// GetAttr returns the attribute referenced by key
+func (n *Node) GetAttr(key string) (string, bool) {
+	for _, attr := range n.current.Attr {
+		if attr.Key == key {
+			return attr.Val, true
 		}
 	}
+	return "", false
+}
 
+// ReplaceAttr replaces the value at key with something else
+func (n *Node) ReplaceAttr(key string, val string) {
+	out := make([]html.Attribute, len(n.current.Attr))
+	for i, attr := range n.current.Attr {
+		switch {
+		case attr.Key == key:
+			out[i] = html.Attribute{
+				Namespace: attr.Namespace,
+				Key:       attr.Key,
+				Val:       val,
+			}
+		default:
+			out[i] = attr
+		}
+	}
+	n.current.Attr = out
+}
+
+// RemoveAttr deletes the attribute at key
+func (n *Node) RemoveAttr(key string) {
+	for i, attr := range n.current.Attr {
+		if attr.Key == key {
+			n.current.Attr = append(n.current.Attr[0:i], n.current.Attr[i+1:]...)
+			return
+		}
+	}
+}
+
+// AddAttr adds an attribute at key.  It does not verify that the attribute already
+// exists.  Adding an attribute that already exists will result in multiple attributes of the
+// same name.
+func (n *Node) AddAttr(key, val string) {
+	n.current.Attr = append(n.current.Attr, html.Attribute{
+		Key: key,
+		Val: val,
+	})
+}
+
+// TagHandler performs some alteration of the tag referenced either by the Tag() value
+// or the TagText.  Tag takes precendence over the TagText value.
+type TagHandler interface {
+	Tag()
+	TagText() string
+	Handle(n *Node) error
+}
+
+// TemplateCompiler compiles templates using the registered handlers
+type TemplateCompiler interface {
+	Scan() error
+	RegisterTagHandler(h TagHandler) error
+	Compile() error
+}
+
+// Context specifies the build context.  See docs for an explanation:
+// TODO: add docs link
+type Context struct {
+	//
+	TC       TemplateCompiler
+	OutputFS map[string]*fs.Filesystem
+	InputFS  *fs.Filesystem
+}
+
+// New returns a new build context, setting the template compiler and any global
+// options
+func New(root string, opts ...BuildOption) (*Context, error) {
+	// TODO: figure out how to create a top level build context
+	return nil, nil
 }
 
 type BuildOption func(*options) error
